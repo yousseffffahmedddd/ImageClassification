@@ -1,6 +1,6 @@
 import numpy as np
 class LogisticRegression:
-    def __init__(self, lr=0.5, epochs=300, reg_lambda=1.0):
+    def __init__(self, lr=0.5, epochs=500, reg_lambda=1.0):
         self.lr = lr
         self.epochs = epochs
         self.reg_lambda = reg_lambda

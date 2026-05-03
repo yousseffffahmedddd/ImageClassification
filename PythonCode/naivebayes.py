@@ -7,8 +7,8 @@ from sklearn.decomposition import PCA
 # =========================
 # DATA LOADING
 # =========================
-base_path = "C:/Users/sheha/Downloads/ImageClassification-main/dataset/"
-
+#base_path = "C:/Users/sheha/Downloads/ImageClassification-main/dataset/"
+base_path= "C:/Users/Lenovo/Desktop/mnist/project/dataset/"
 def load_mnist_images(filename):
     with open(filename, 'rb') as f:
         data = np.frombuffer(f.read(), np.uint8, offset=16)
@@ -18,14 +18,11 @@ def load_mnist_labels(filename):
     with open(filename, 'rb') as f:
         return np.frombuffer(f.read(), np.uint8, offset=8)
 
-# =========================
-# FILTER BINARY (0 vs 1)
-# =========================
-def filter_binary(X, y, c1, c2):
-    mask = (y == c1) | (y == c2)
-    X_out = X[mask]
-    y_out = np.where(y[mask] == c1, 0, 1) # Remap to 0 and 1
-    return X_out, y_out
+#mistake 1 
+def filter_binary_one_vs_all(X, y, positive_class):
+    # Keep ALL samples, label positive_class as 1, everything else as 0
+    y_out = np.where(y == positive_class, 1, 0)
+    return X, y_out
 
 # =========================
 # NAIVE BAYES
@@ -111,9 +108,9 @@ def main():
     x_test = load_mnist_images(base_path + 't10k-images-idx3-ubyte/t10k-images-idx3-ubyte')
     y_test = load_mnist_labels(base_path + 't10k-labels-idx1-ubyte/t10k-labels-idx1-ubyte')
 
-    
-    X_train_full, y_train_full = filter_binary(x_train, y_train, 0, 1)
-    X_test, y_test = filter_binary(x_test, y_test, 0, 1)
+    #mistake 2
+    X_train_full, y_train_full = filter_binary_one_vs_all(x_train, y_train, 0)
+    X_test, y_test = filter_binary_one_vs_all(x_test, y_test, 0)
 
     print("Filtered Train:", len(X_train_full))
     print("Filtered Test :", len(X_test))
