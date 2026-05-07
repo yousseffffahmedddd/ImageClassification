@@ -1,184 +1,361 @@
+#phase 1
+# import numpy as np
+
+# class DecisionTree:
+#     def __init__(
+#         self,
+#         max_depth=20,
+#         min_samples_split=5,
+#         min_samples_leaf=2,
+#         n_features=100,
+#         n_thresholds=10,
+#         random_state=42
+#     ):
+#         self.max_depth = max_depth
+#         self.min_samples_split = min_samples_split
+#         self.min_samples_leaf = min_samples_leaf
+#         self.n_features = n_features
+#         self.n_thresholds = n_thresholds
+#         self.rng = np.random.default_rng(random_state)
+#         self.root = None
+
+#     # =========================
+#     # Train
+#     # =========================
+#     def fit(self, X, y):
+#         self.root = self._grow(X, y, depth=0)
+#         return self
+
+#     # =========================
+#     # Predict
+#     # =========================
+#     def predict(self, X):
+#         return np.array([self._traverse(x, self.root) for x in X])
+
+#     # =========================
+#     # Tree Growth
+#     # =========================
+#     def _grow(self, X, y, depth):
+
+#         if (
+#             depth >= self.max_depth
+#             or len(y) < self.min_samples_split
+#             or np.all(y == y[0])
+#         ):
+#             return {
+#                 "leaf": True,
+#                 "value": np.mean(y)   # 🔥 probability instead of majority vote
+#             }
+
+#         n_samples, n_feats = X.shape
+
+#         feat_idxs = self.rng.choice(
+#             n_feats,
+#             min(self.n_features, n_feats),
+#             replace=False
+#         )
+
+#         best_feat, best_thresh = self._best_split(X, y, feat_idxs)
+
+#         if best_feat is None:
+#             return {"leaf": True, "value": np.mean(y)}
+
+#         left = X[:, best_feat] <= best_thresh
+#         right = ~left
+
+#         return {
+#             "leaf": False,
+#             "feature": best_feat,
+#             "threshold": best_thresh,
+#             "left": self._grow(X[left], y[left], depth + 1),
+#             "right": self._grow(X[right], y[right], depth + 1),
+#         }
+
+#     # =========================
+#     # Best Split (Gini)
+#     # =========================
+#     def _best_split(self, X, y, feat_idxs):
+#         best_gain = -1
+#         split_idx, split_thresh = None, None
+
+#         parent_gini = self._gini(y)
+
+#         for feat in feat_idxs:
+#             X_col = X[:, feat]
+
+#             percentiles = np.linspace(5, 95, self.n_thresholds)
+#             thresholds = np.percentile(X_col, percentiles)
+
+#             for t in thresholds:
+#                 left = X_col <= t
+#                 right = ~left
+
+#                 if (
+#                     left.sum() < self.min_samples_leaf
+#                     or right.sum() < self.min_samples_leaf
+#                 ):
+#                     continue
+
+#                 g_left = self._gini(y[left])
+#                 g_right = self._gini(y[right])
+
+#                 n = len(y)
+#                 child = (left.sum() / n) * g_left + (right.sum() / n) * g_right
+
+#                 gain = parent_gini - child
+
+#                 if gain > best_gain:
+#                     best_gain = gain
+#                     split_idx = feat
+#                     split_thresh = t
+
+#         return split_idx, split_thresh
+
+#     # =========================
+#     # Gini
+#     # =========================
+#     def _gini(self, y):
+#         if len(y) == 0:
+#             return 0
+#         p = np.mean(y)
+#         return 1 - (p**2 + (1 - p)**2)
+
+#     # =========================
+#     # Leaf Decision (🔥 RECALIBRATED FOR RECALL)
+#     # =========================
+#     def _traverse(self, x, node):
+#         if node["leaf"]:
+#             # 🔥 LOWER threshold → MORE positives → higher recall
+#             return 1 if node["value"] >= 0.25 else 0
+
+#         if x[node["feature"]] <= node["threshold"]:
+#             return self._traverse(x, node["left"])
+#         else:
+#             return self._traverse(x, node["right"])
+
+# # =========================
+# # Flatten
+# # =========================
+# def extract_features(X):
+#     return X.reshape(len(X), -1)
+
+
+# # =========================
+# # PCA
+# # =========================
+# def apply_pca(X_train, X_test):
+#     pca = PCA(n_components=PCA_K)
+
+#     X_train_pca = pca.fit_transform(X_train)
+#     X_test_pca = pca.transform(X_test)
+
+#     return X_train_pca, X_test_pca
+
+
+# # =========================
+# # Undersampling
+# # =========================
+# def balance_data(X, y):
+#     X_pos = X[y == 1]
+#     X_neg = X[y == 0]
+
+#     idx = np.random.choice(len(X_neg), len(X_pos), replace=False)
+#     X_neg_down = X_neg[idx]
+
+#     X_bal = np.vstack((X_neg_down, X_pos))
+#     y_bal = np.hstack((np.zeros(len(X_neg_down)), np.ones(len(X_pos))))
+
+#     perm = np.random.permutation(len(X_bal))
+#     return X_bal[perm], y_bal[perm]
+
+
+# # =========================
+# # K-Fold
+# # =========================
+# def k_fold_split(X, y, k=5):
+#     indices = np.random.permutation(len(X))
+#     folds = np.array_split(indices, k)
+
+#     for i in range(k):
+#         test_idx = folds[i]
+#         train_idx = np.hstack([folds[j] for j in range(k) if j != i])
+#         yield X[train_idx], y[train_idx], X[test_idx], y[test_idx]
+#phase 2 
+
 import numpy as np
+
 
 class DecisionTree:
     def __init__(
         self,
-        max_depth=12,
+        max_depth=20,
         min_samples_split=5,
         min_samples_leaf=2,
-        n_features=100,
+        n_features=None,        # None = use ALL features at every split
         n_thresholds=10,
         random_state=42
     ):
-        self.max_depth = max_depth
+        self.max_depth         = max_depth
         self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
-        self.n_features = n_features
-        self.n_thresholds = n_thresholds
-        self.rng = np.random.default_rng(random_state)
-        self.root = None
+        self.min_samples_leaf  = min_samples_leaf
+        self.n_features        = n_features
+        self.n_thresholds      = n_thresholds
+        self.rng               = np.random.default_rng(random_state)
+        self.root              = None
 
-    # =========================
-    # Train
-    # =========================
+    # ─────────────────────────────────────────
+    #  Train
+    # ─────────────────────────────────────────
     def fit(self, X, y):
-        self.root = self._grow(X, y, depth=0)
+        self.root = self._grow(X, y.astype(int), depth=0)
         return self
 
-    # =========================
-    # Predict
-    # =========================
+    # ─────────────────────────────────────────
+    #  Predict
+    # ─────────────────────────────────────────
     def predict(self, X):
         return np.array([self._traverse(x, self.root) for x in X])
 
-    # =========================
-    # Tree Growth
-    # =========================
+    # ─────────────────────────────────────────
+    #  Tree Growth
+    # ─────────────────────────────────────────
     def _grow(self, X, y, depth):
 
+        # ── Stop conditions ──────────────────
         if (
             depth >= self.max_depth
             or len(y) < self.min_samples_split
-            or np.all(y == y[0])
+            or len(np.unique(y)) == 1          # all same class → pure leaf
         ):
-            return {
-                "leaf": True,
-                "value": np.mean(y)   # 🔥 probability instead of majority vote
-            }
+            return self._make_leaf(y)
 
         n_samples, n_feats = X.shape
 
-        feat_idxs = self.rng.choice(
-            n_feats,
-            min(self.n_features, n_feats),
-            replace=False
-        )
+        # ── Feature sampling ─────────────────
+        # None  → use all features (best accuracy for single tree)
+        # int   → use that many randomly (Random Forest style)
+        if self.n_features is None:
+            feat_idxs = np.arange(n_feats)
+        else:
+            feat_idxs = self.rng.choice(
+                n_feats,
+                min(self.n_features, n_feats),
+                replace=False
+            )
 
         best_feat, best_thresh = self._best_split(X, y, feat_idxs)
 
         if best_feat is None:
-            return {"leaf": True, "value": np.mean(y)}
+            return self._make_leaf(y)
 
-        left = X[:, best_feat] <= best_thresh
-        right = ~left
+        left_mask  = X[:, best_feat] <= best_thresh
+        right_mask = ~left_mask
 
         return {
-            "leaf": False,
-            "feature": best_feat,
+            "leaf":      False,
+            "feature":   best_feat,
             "threshold": best_thresh,
-            "left": self._grow(X[left], y[left], depth + 1),
-            "right": self._grow(X[right], y[right], depth + 1),
+            "left":      self._grow(X[left_mask],  y[left_mask],  depth + 1),
+            "right":     self._grow(X[right_mask], y[right_mask], depth + 1),
         }
 
-    # =========================
-    # Best Split (Gini)
-    # =========================
+    # ─────────────────────────────────────────
+    #  Leaf — stores MAJORITY CLASS label
+    # ─────────────────────────────────────────
+    def _make_leaf(self, y):
+        """
+        Bug 2 fix: store the most frequent class label.
+        np.mean(y) was wrong — gives 4.5 for balanced 10-class data.
+        np.bincount().argmax() gives the actual majority class.
+        """
+        majority_class = int(np.bincount(y.astype(int)).argmax())
+        return {"leaf": True, "value": majority_class}
+
+    # ─────────────────────────────────────────
+    #  Best Split — uses correct multi-class Gini
+    # ─────────────────────────────────────────
     def _best_split(self, X, y, feat_idxs):
-        best_gain = -1
-        split_idx, split_thresh = None, None
+        best_gain    = -1
+        split_feat   = None
+        split_thresh = None
 
         parent_gini = self._gini(y)
 
         for feat in feat_idxs:
             X_col = X[:, feat]
 
-            percentiles = np.linspace(5, 95, self.n_thresholds)
-            thresholds = np.percentile(X_col, percentiles)
+            # Sample thresholds using percentiles
+            thresholds = np.unique(
+                np.percentile(X_col, np.linspace(5, 95, self.n_thresholds))
+            )
 
             for t in thresholds:
-                left = X_col <= t
+                left  = X_col <= t
                 right = ~left
 
                 if (
-                    left.sum() < self.min_samples_leaf
+                    left.sum()  < self.min_samples_leaf
                     or right.sum() < self.min_samples_leaf
                 ):
                     continue
 
-                g_left = self._gini(y[left])
+                n       = len(y)
+                g_left  = self._gini(y[left])
                 g_right = self._gini(y[right])
-
-                n = len(y)
-                child = (left.sum() / n) * g_left + (right.sum() / n) * g_right
-
-                gain = parent_gini - child
+                child   = (left.sum() / n) * g_left + (right.sum() / n) * g_right
+                gain    = parent_gini - child
 
                 if gain > best_gain:
-                    best_gain = gain
-                    split_idx = feat
+                    best_gain    = gain
+                    split_feat   = feat
                     split_thresh = t
 
-        return split_idx, split_thresh
+        return split_feat, split_thresh
 
-    # =========================
-    # Gini
-    # =========================
+    # ─────────────────────────────────────────
+    #  Gini Impurity — TRUE multi-class formula
+    # ─────────────────────────────────────────
     def _gini(self, y):
-        if len(y) == 0:
-            return 0
-        p = np.mean(y)
-        return 1 - (p**2 + (1 - p)**2)
+        """
+        Bug 1 fix: correct multi-class Gini.
 
-    # =========================
-    # Leaf Decision (🔥 RECALIBRATED FOR RECALL)
-    # =========================
+        OLD (binary only):
+            p = np.mean(y)
+            return 1 - (p**2 + (1-p)**2)
+            → only works for y ∈ {0,1}
+            → gives nonsense for y ∈ {0,1,...,9}
+
+        NEW (true multi-class):
+            Gini = 1 - Σₖ pₖ²
+            where pₖ = fraction of samples belonging to class k
+        """
+        if len(y) == 0:
+            return 0.0
+        counts = np.bincount(y.astype(int))
+        probs  = counts / len(y)              # pₖ for each class k
+        return 1.0 - np.sum(probs ** 2)       # 1 - Σpₖ²
+
+    # ─────────────────────────────────────────
+    #  Traverse — returns label directly
+    # ─────────────────────────────────────────
     def _traverse(self, x, node):
-        if node["leaf"]:
-            # 🔥 LOWER threshold → MORE positives → higher recall
+        """
+        Bug 3 fix: return the class label directly.
+
+        OLD:
             return 1 if node["value"] >= 0.25 else 0
+            → only ever outputs 0 or 1 — impossible to predict 2–9
+
+        NEW:
+            return node["value"]  (the majority class stored at leaf)
+        """
+        if node["leaf"]:
+            return node["value"]
 
         if x[node["feature"]] <= node["threshold"]:
             return self._traverse(x, node["left"])
         else:
             return self._traverse(x, node["right"])
-
-# =========================
-# Flatten
-# =========================
-def extract_features(X):
-    return X.reshape(len(X), -1)
-
-
-# =========================
-# PCA
-# =========================
-def apply_pca(X_train, X_test):
-    pca = PCA(n_components=PCA_K)
-
-    X_train_pca = pca.fit_transform(X_train)
-    X_test_pca = pca.transform(X_test)
-
-    return X_train_pca, X_test_pca
-
-
-# =========================
-# Undersampling
-# =========================
-def balance_data(X, y):
-    X_pos = X[y == 1]
-    X_neg = X[y == 0]
-
-    idx = np.random.choice(len(X_neg), len(X_pos), replace=False)
-    X_neg_down = X_neg[idx]
-
-    X_bal = np.vstack((X_neg_down, X_pos))
-    y_bal = np.hstack((np.zeros(len(X_neg_down)), np.ones(len(X_pos))))
-
-    perm = np.random.permutation(len(X_bal))
-    return X_bal[perm], y_bal[perm]
-
-
-# =========================
-# K-Fold
-# =========================
-def k_fold_split(X, y, k=5):
-    indices = np.random.permutation(len(X))
-    folds = np.array_split(indices, k)
-
-    for i in range(k):
-        test_idx = folds[i]
-        train_idx = np.hstack([folds[j] for j in range(k) if j != i])
-        yield X[train_idx], y[train_idx], X[test_idx], y[test_idx]
 """"
 #(Main)
 import os
