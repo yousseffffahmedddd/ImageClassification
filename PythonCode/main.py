@@ -408,11 +408,11 @@ def run_pipeline(model, model_name, X_all_tr, y_all_tr,
 # ══════════════════════════════════════════════════════════════
 def make_models():
     return {
-        # 'Logistic Regression': LogisticRegression(lr=0.1, epochs=300),
-        # 'KNN':                 KNN(),
-        # 'Decision Tree':       DecisionTree(),
+         'Logistic Regression': LogisticRegression(lr=0.1, epochs=500),
+         'KNN':                 KNN(),
+        'Decision Tree':       DecisionTree(),
         'Naive Bayes':         GaussianNB(),
-        # 'SVM':                 LinearSVM(),
+        'SVM':                 LinearSVM(),
     }
 
 
