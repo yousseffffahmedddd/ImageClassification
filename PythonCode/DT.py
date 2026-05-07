@@ -180,7 +180,7 @@
 #         test_idx = folds[i]
 #         train_idx = np.hstack([folds[j] for j in range(k) if j != i])
 #         yield X[train_idx], y[train_idx], X[test_idx], y[test_idx]
-#phase 2 
+#phase2 
 
 import numpy as np
 

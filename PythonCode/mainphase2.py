@@ -36,7 +36,7 @@ print("Raw shapes:", x_train_raw.shape, y_train_raw.shape,
 
 
 # ══════════════════════════════════════════════════════════════
-#  2. NORMALISE  (all sets)
+#  2. NORMALISE  
 # ══════════════════════════════════════════════════════════════
 X_all   = x_train_raw.reshape(-1, 784) / 255.0   # (60000, 784)
 y_all   = (y_train_raw).astype(int)          # 1 = digit 0, 0 = others
