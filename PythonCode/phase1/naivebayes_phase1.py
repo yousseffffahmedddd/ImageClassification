@@ -1,14 +1,15 @@
 import numpy as np
 import math
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
-from sklearn.model_selection import KFold
-from sklearn.decomposition import PCA
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, confusion_matrix, classification_report
+)
 
 # =========================
 # DATA LOADING
 # =========================
-#base_path = "C:/Users/sheha/Downloads/ImageClassification-main/dataset/"
-base_path= "C:/Users/Lenovo/Desktop/mnist/project/dataset/"
+base_path = "C:/Users/sheha/Downloads/ImageClassification-main/dataset/"
+
 def load_mnist_images(filename):
     with open(filename, 'rb') as f:
         data = np.frombuffer(f.read(), np.uint8, offset=16)
@@ -18,11 +19,39 @@ def load_mnist_labels(filename):
     with open(filename, 'rb') as f:
         return np.frombuffer(f.read(), np.uint8, offset=8)
 
-#mistake 1 
 def filter_binary_one_vs_all(X, y, positive_class):
-    # Keep ALL samples, label positive_class as 1, everything else as 0
     y_out = np.where(y == positive_class, 1, 0)
     return X, y_out
+
+
+# =========================
+# CUSTOM PCA
+# =========================
+class PCA_Custom:
+    def __init__(self, n_components):
+        self.n_components = n_components
+        self.mean = None
+        self.components = None
+
+    def fit(self, X):
+        self.mean = np.mean(X, axis=0)
+        X_centered = X - self.mean
+
+        cov_matrix = np.cov(X_centered, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+
+        sorted_indices = np.argsort(eigenvalues)[::-1]
+        eigenvectors = eigenvectors[:, sorted_indices]
+
+        self.components = eigenvectors[:, :self.n_components]
+
+    def transform(self, X):
+        return np.dot(X - self.mean, self.components)
+
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.transform(X)
+
 
 # =========================
 # NAIVE BAYES
@@ -35,38 +64,36 @@ class GaussianNB:
         self.vars = {}
 
     def fit(self, X, y):
-        X = np.array(X)
-        y = np.array(y)
         self.classes = np.unique(y)
         n_samples = len(X)
 
         for c in self.classes:
             X_c = X[y == c]
             self.priors[c] = len(X_c) / n_samples
-            
             self.means[c] = np.mean(X_c, axis=0)
-            self.vars[c] = np.var(X_c, axis=0) + 1e-6   
+            self.vars[c] = np.var(X_c, axis=0) + 1e-6
 
     def predict(self, X):
-        X = np.array(X)
         y_pred = []
-        
+
         for x in X:
             best_class = None
             best_score = -float('inf')
 
             for c in self.classes:
-                # Vectorized log probability calculation for the entire feature vector
-                log_probs = -0.5 * np.log(2 * np.pi * self.vars[c]) - ((x - self.means[c]) ** 2) / (2 * self.vars[c])
+                log_probs = -0.5 * np.log(2 * np.pi * self.vars[c]) \
+                            - ((x - self.means[c]) ** 2) / (2 * self.vars[c])
+
                 score = np.log(self.priors[c]) + np.sum(log_probs)
 
                 if score > best_score:
                     best_score = score
                     best_class = c
-                    
+
             y_pred.append(best_class)
-            
+
         return np.array(y_pred)
+
 
 # =========================
 # EVALUATION
@@ -97,6 +124,32 @@ def print_results(name, y_true, y_pred):
 
 
 # =========================
+# MANUAL K-FOLD SPLIT
+# =========================
+def manual_kfold_split(X, y, n_splits=5, shuffle=True, seed=42):
+    np.random.seed(seed)
+
+    indices = np.arange(len(X))
+
+    if shuffle:
+        np.random.shuffle(indices)
+
+    fold_size = len(X) // n_splits
+    folds = []
+
+    for i in range(n_splits):
+        start = i * fold_size
+        end = (i + 1) * fold_size if i != n_splits - 1 else len(X)
+
+        val_idx = indices[start:end]
+        train_idx = np.concatenate([indices[:start], indices[end:]])
+
+        folds.append((train_idx, val_idx))
+
+    return folds
+
+
+# =========================
 # MAIN
 # =========================
 def main():
@@ -108,30 +161,31 @@ def main():
     x_test = load_mnist_images(base_path + 't10k-images-idx3-ubyte/t10k-images-idx3-ubyte')
     y_test = load_mnist_labels(base_path + 't10k-labels-idx1-ubyte/t10k-labels-idx1-ubyte')
 
-    #mistake 2
     X_train_full, y_train_full = filter_binary_one_vs_all(x_train, y_train, 0)
     X_test, y_test = filter_binary_one_vs_all(x_test, y_test, 0)
 
-    print("Filtered Train:", len(X_train_full))
-    print("Filtered Test :", len(X_test))
+    print("Train size:", len(X_train_full))
+    print("Test size :", len(X_test))
+
 
     # =========================
-    # K-FOLD CROSS VALIDATION
+    # MANUAL K-FOLD CV
     # =========================
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    print("\nRunning Manual K-Fold Cross Validation...\n")
+
+    folds = manual_kfold_split(X_train_full, y_train_full, n_splits=5, shuffle=True, seed=42)
     results = []
 
-    print("\nRunning K-Fold Cross Validation...\n")
+    for fold, (train_idx, val_idx) in enumerate(folds):
 
-    for fold, (train_idx, val_idx) in enumerate(kf.split(X_train_full)):
         X_train_fold = X_train_full[train_idx]
         y_train_fold = y_train_full[train_idx]
 
         X_val_fold = X_train_full[val_idx]
         y_val_fold = y_train_full[val_idx]
 
-        
-        pca = PCA(n_components=100)
+        # PCA per fold (NO leakage)
+        pca = PCA_Custom(n_components=100)
         X_train_pca = pca.fit_transform(X_train_fold)
         X_val_pca = pca.transform(X_val_fold)
 
@@ -145,13 +199,16 @@ def main():
 
         print(f"Fold {fold+1} Accuracy:", round(metrics["accuracy"], 4))
 
+    print("\nMean CV Accuracy:",
+          round(np.mean([r["accuracy"] for r in results]), 4))
+
+
     # =========================
-    # FINAL TRAINING ON FULL DATA
+    # FINAL TRAINING
     # =========================
     print("\nTraining final model...")
 
-    # Apply PCA to the entire training set for the final model
-    pca_final = PCA(n_components=100)
+    pca_final = PCA_Custom(n_components=100)
     X_train_full_pca = pca_final.fit_transform(X_train_full)
     X_test_pca = pca_final.transform(X_test)
 
@@ -159,6 +216,7 @@ def main():
     final_model.fit(X_train_full_pca, y_train_full)
 
     y_test_pred = final_model.predict(X_test_pca)
+
 
     # =========================
     # FINAL RESULTS
