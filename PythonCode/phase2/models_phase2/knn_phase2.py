@@ -8,30 +8,30 @@ def pca(X_train, X_test, n_components=50):
     X_train_centered = X_train - mean_vector
     X_test_centered  = X_test  - mean_vector
     cov_matrix = np.cov(X_train_centered, rowvar=False)
-    
+
     eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
     sorted_idx = np.argsort(eigenvalues)[::-1]
     components = eigenvectors[:, sorted_idx][:, :n_components]
-    
+
     return np.dot(X_train_centered, components), np.dot(X_test_centered, components)
 
 def evaluate_and_plot_matrix(y_true, y_pred, model_name="Model"):
     print(f"\n[{model_name}] Classification Report:")
     print(classification_report(y_true, y_pred, digits=4))
-    
+
     acc = accuracy_score(y_true, y_pred)
     w_f1 = f1_score(y_true, y_pred, average='weighted')
-    
+
     fig, ax = plt.subplots(figsize=(6, 5))
     ConfusionMatrixDisplay.from_predictions(y_true, y_pred, ax=ax, cmap='Blues', colorbar=True)
     ax.set_title(f'{model_name} Confusion Matrix')
-    plt.show() 
-    
+    plt.show()
+
     return acc, w_f1
 
 def plot_final_diagnostics(k_results, k_vals, train_accs, val_accs, names, accs, f1s):
     plt.figure(figsize=(16, 5))
-    
+
     plt.subplot(1, 3, 1)
     plt.plot(list(k_results.keys()), list(k_results.values()), marker='o', color='purple')
     plt.title('5-Fold CV: K vs Accuracy')
@@ -42,16 +42,16 @@ def plot_final_diagnostics(k_results, k_vals, train_accs, val_accs, names, accs,
     plt.subplot(1, 3, 2)
     plt.plot(k_vals, train_accs, marker='o', label='Train Acc', color='blue')
     plt.plot(k_vals, val_accs, marker='o', label='Val Acc', color='red')
-    
+
     best_k_val = k_vals[np.argmax(val_accs)]
     plt.axvspan(min(k_vals), best_k_val, color='red', alpha=0.1, label='High Variance')
     plt.axvspan(best_k_val, max(k_vals), color='blue', alpha=0.05, label='High Bias')
     plt.axvline(x=best_k_val, color='green', linestyle='--', label=f'Optimal K ({best_k_val})')
-    
+
     plt.title('Complexity Curve')
     plt.xlabel('K')
     plt.ylabel('Accuracy')
-    plt.legend(loc='lower left', fontsize='small')
+    plt.legend(loc='upper right', fontsize='small')
     plt.grid(True, alpha=0.3)
 
     plt.subplot(1, 3, 3)
@@ -61,7 +61,7 @@ def plot_final_diagnostics(k_results, k_vals, train_accs, val_accs, names, accs,
     plt.xticks(x, names)
     plt.title('Model Comparison')
     plt.legend()
-    
+
     plt.tight_layout()
     plt.show()
 
@@ -94,35 +94,24 @@ class EnsembleKNN:
         for X_sub, y_sub in self.models:
             dists = np.sum(X_test**2, axis=1, keepdims=True) + np.sum(X_sub**2, axis=1) - 2*np.dot(X_test, X_sub.T)
             all_preds.append([np.bincount(y_sub[np.argsort(d)[:self.k]]).argmax() for d in dists])
-            
+
         return np.apply_along_axis(lambda x: np.bincount(x.astype(int)).argmax(), axis=0, arr=np.array(all_preds))
 
 
 def manual_kfold_cv(X, y, model, n_splits=5):
     fold_size = len(X) // n_splits
     indices = np.random.permutation(len(X))
-    
+
     accuracies = []
     for i in range(n_splits):
         val_idx = indices[i * fold_size : (i + 1) * fold_size]
         train_idx = np.concatenate([indices[:i * fold_size], indices[(i + 1) * fold_size:]])
-        
+
         model.fit(X[train_idx], y[train_idx])
         accuracies.append(np.mean(model.predict(X[val_idx]) == y[val_idx]))
-        
+
     return np.mean(accuracies)
 
-def generate_complexity_curve(X_train, y_train, X_val, y_val, k_max=15):
-    k_vals = list(range(1, k_max + 1))
-    train_accs, val_accs = [], []
-    
-    for k in k_vals:
-        model = KNN_Baseline(k=k)
-        model.fit(X_train, y_train)
-        train_accs.append(np.mean(model.predict(X_train) == y_train))
-        val_accs.append(np.mean(model.predict(X_val) == y_val))
-        
-    return k_vals, train_accs, val_accs
 
 
 if __name__ == "__main__":
@@ -130,39 +119,39 @@ if __name__ == "__main__":
 
     train_df = pd.read_csv("/content/sample_data/mnist_train_small.csv", header=None)
     test_df = pd.read_csv("/content/sample_data/mnist_test.csv", header=None)
-    
+
     X_train, y_train = train_df.iloc[:, 1:].values / 255.0, train_df.iloc[:, 0].values
     X_test, y_test = test_df.iloc[:, 1:].values / 255.0, test_df.iloc[:, 0].values
 
     X_train_pca, X_test_pca = pca(X_train, X_test, n_components=50)
 
-    # 1. Hyperparameter Tuning
     k_tuning_results = {}
-    X_cv, y_cv = X_train_pca[:3000], y_train[:3000]
-    
-    for k in range(1, 11): 
-        k_tuning_results[k] = manual_kfold_cv(X_cv, y_cv, KNN_Baseline(k=k), n_splits=5)
+    k_range = range(1, 16)
+    X_tuning, y_tuning = X_train_pca[:3000], y_train[:3000]
+    train_accs = []
+
+    for k in k_range:
+        val_score = manual_kfold_cv(X_tuning, y_tuning, KNN_Baseline(k=k), n_splits=5)
+        k_tuning_results[k] = val_score
+        
+        model_temp = KNN_Baseline(k=k)
+        model_temp.fit(X_tuning, y_tuning)
+        train_accs.append(np.mean(model_temp.predict(X_tuning) == y_tuning))
+
     best_k = max(k_tuning_results, key=k_tuning_results.get)
 
-    # 2. Complexity Curve Generation
-    k_vals, train_accs, val_accs = generate_complexity_curve(
-        X_train_pca[:2000], y_train[:2000], 
-        X_train_pca[5000:6000], y_train[5000:6000], 
-        k_max=15
-    )
-
-    # 3. Model Training & Evaluation (Controlled Setup)
-    TRAIN_SIZE = 5000 
+    # 2. Final Training & Evaluation
+    TRAIN_SIZE = 5000
     X_train_fair, y_train_fair = X_train_pca[:TRAIN_SIZE], y_train[:TRAIN_SIZE]
 
     knn_final = KNN_Baseline(k=best_k)
     knn_final.fit(X_train_fair, y_train_fair)
     acc_k, f1_k = evaluate_and_plot_matrix(y_test, knn_final.predict(X_test_pca), "Baseline KNN")
 
-    ensemble_knn = EnsembleKNN(k=best_k, n_estimators=20) 
+    ensemble_knn = EnsembleKNN(k=best_k, n_estimators=20)
     ensemble_knn.fit(X_train_fair, y_train_fair)
     acc_enk, f1_enk = evaluate_and_plot_matrix(y_test, ensemble_knn.predict(X_test_pca), "Ensemble KNN")
 
-    # 4. Final Diagnostics Plot
-    plot_final_diagnostics(k_tuning_results, k_vals, train_accs, val_accs, 
+    # 3. Final Diagnostics Plot (Now using synced data)
+    plot_final_diagnostics(k_tuning_results, list(k_range), train_accs, list(k_tuning_results.values()),
                            ['KNN Baseline', 'Ensemble KNN'], [acc_k, acc_enk], [f1_k, f1_enk])
