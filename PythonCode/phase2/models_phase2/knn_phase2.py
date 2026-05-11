@@ -152,6 +152,6 @@ if __name__ == "__main__":
     ensemble_knn.fit(X_train_fair, y_train_fair)
     acc_enk, f1_enk = evaluate_and_plot_matrix(y_test, ensemble_knn.predict(X_test_pca), "Ensemble KNN")
 
-    # 3. Final Diagnostics Plot (Now using synced data)
+    # 3. Final Diagnostics Plot
     plot_final_diagnostics(k_tuning_results, list(k_range), train_accs, list(k_tuning_results.values()),
                            ['KNN Baseline', 'Ensemble KNN'], [acc_k, acc_enk], [f1_k, f1_enk])
