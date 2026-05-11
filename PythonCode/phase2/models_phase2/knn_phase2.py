@@ -131,9 +131,11 @@ if __name__ == "__main__":
     train_accs = []
 
     for k in k_range:
+        # Cross-validation for the first graph and the optimal K choice
         val_score = manual_kfold_cv(X_tuning, y_tuning, KNN_Baseline(k=k), n_splits=5)
         k_tuning_results[k] = val_score
         
+        # Training accuracy for the second graph (complexity curve)
         model_temp = KNN_Baseline(k=k)
         model_temp.fit(X_tuning, y_tuning)
         train_accs.append(np.mean(model_temp.predict(X_tuning) == y_tuning))
@@ -141,8 +143,7 @@ if __name__ == "__main__":
     best_k = max(k_tuning_results, key=k_tuning_results.get)
 
     # 2. Final Training & Evaluation
-    TRAIN_SIZE = 5000
-    X_train_fair, y_train_fair = X_train_pca[:TRAIN_SIZE], y_train[:TRAIN_SIZE]
+    X_train_fair, y_train_fair = X_train_pca, y_train
 
     knn_final = KNN_Baseline(k=best_k)
     knn_final.fit(X_train_fair, y_train_fair)
@@ -152,6 +153,6 @@ if __name__ == "__main__":
     ensemble_knn.fit(X_train_fair, y_train_fair)
     acc_enk, f1_enk = evaluate_and_plot_matrix(y_test, ensemble_knn.predict(X_test_pca), "Ensemble KNN")
 
-    # 3. Final Diagnostics Plot
+    # 3. Final Diagnostics Plot 
     plot_final_diagnostics(k_tuning_results, list(k_range), train_accs, list(k_tuning_results.values()),
                            ['KNN Baseline', 'Ensemble KNN'], [acc_k, acc_enk], [f1_k, f1_enk])
